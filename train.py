@@ -1,10 +1,11 @@
-import os, glob
+import os, glob, tf2onnx, onnx
 import numpy as np 
 from PIL import Image, ImageChops, ImageEnhance
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPool2D
 from keras.optimizers import RMSprop
 from keras.callbacks import EarlyStopping
+import tensorflow as tf
 
 from utils import parse_images_and_labels
 
@@ -32,7 +33,7 @@ model.add(Dense(2, activation="softmax"))
 
 optimizer = RMSprop(learning_rate=0.0005, rho=0.9, epsilon=1e-8, decay=0.0)
 model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
-epochs = 100
+epochs = 30
 batch_size = 5
 print(X_train_real.shape, X_train_fake.shape)
 X_train = np.concatenate((X_train_real, X_train_fake))
@@ -41,6 +42,10 @@ X_val = np.concatenate((X_val_real, X_val_fake))
 Y_val = np.concatenate((Y_val_real, Y_val_fake))
 early_stopping = EarlyStopping(monitor='val_acc', restore_best_weights=True, mode="max")
 history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_val, Y_val), verbose=2, shuffle=True, callbacks=[early_stopping])
-model.save('best.h5')
+model.output_names = ['output']
+input_signature = [tf.TensorSpec(model.inputs[0].shape, model.inputs[0].dtype, name='image_after_resultFunction')]
+    
+onnx_model, _ = tf2onnx.convert.from_keras(model,input_signature)
+onnx.save(onnx_model, "best.onnx")
 
 
